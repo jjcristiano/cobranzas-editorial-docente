@@ -1117,9 +1117,156 @@ function agregarNotaSeguimiento({ plan_id, texto, actualizar_recordatorio = true
 }
 
 /**
- * Seed realistic initial data for Editorial Docente around Noviembre 2026
+ * Seed realistic continuous data from Enero 2025 through Hoy (13/11/2026)
  */
 function seedInitialPlans() {
+  const payRest = (plan, countToPay, cuentaDefault, dayOfMonth = 8) => {
+    const pendientes = plan.cuotas.filter((c) => c.estado !== 'PAGADA');
+    const slice = countToPay === 'ALL' ? pendientes : pendientes.slice(0, countToPay);
+    for (const c of slice) {
+      const fComp = buildDateStr(c.anio_vencimiento, c.mes_vencimiento, dayOfMonth);
+      registrarPagoCuota({
+        plan_id: plan.id,
+        cuota_id: c.id,
+        monto_cobrado: c.saldo_pendiente,
+        cuenta_destino: cuentaDefault,
+        fecha_comprobante: fComp,
+        observacion: 'Transferencia verificada por cobranzas',
+        operadora: 'Marta (Cobranzas)'
+      });
+    }
+  };
+
+  // =========================================================================
+  // AÑO 2025 (ENERO A DICIEMBRE 2025) - HISTÓRICO CONTINUO
+  // =========================================================================
+  const historicos2025 = [
+    { dni: '21450981', nombre: 'Beatriz Alicia', apellido: 'Mendoza', cel: '11 4120-8833', canal: 'SEBASTIAN', cuotas: 3, valor: 32000, mes: 1, cuenta: 'Openpay', dia: 7, status: 'COMPLETADO' },
+    { dni: '23890412', nombre: 'Carlos Alberto', apellido: 'Sánchez', cel: '351 540-2219', canal: 'VENDEDORAS', vend: 'Laura Martínez', cuotas: 3, valor: 35000, mes: 2, cuenta: 'Mercado Pago', dia: 9, status: 'COMPLETADO' },
+    { dni: '25112098', nombre: 'Liliana Esther', apellido: 'Romero', cel: '221 488-9012', canal: 'TRAMOS', cuotas: 4, valor: 36000, mes: 3, cuenta: 'Xise', dia: 6, status: 'COMPLETADO' },
+    { dni: '27334510', nombre: 'Marcela Fabiana', apellido: 'Navarro', cel: '11 5590-1234', canal: 'VENDEDORAS', vend: 'Carolina Gómez', cuotas: 3, valor: 38000, mes: 4, cuenta: 'Adriana', dia: 8, status: 'BAJA_C2' },
+    { dni: '24998120', nombre: 'Gustavo Adolfo', apellido: 'Benítez', cel: '341 623-4455', canal: 'SEBASTIAN', cuotas: 3, valor: 38000, mes: 5, cuenta: 'Openpay', dia: 5, status: 'COMPLETADO' },
+    { dni: '28123900', nombre: 'Verónica Alejandra', apellido: 'Paz', cel: '11 6321-7788', canal: 'TRAMOS', cuotas: 6, valor: 40000, mes: 6, cuenta: 'Mercado Pago', dia: 9, status: 'ADELANTO_TARJETA' },
+    { dni: '26778231', nombre: 'Adrián Marcelo', apellido: 'Torres', cel: '261 512-3390', canal: 'VENDEDORAS', vend: 'Valeria Díaz', cuotas: 3, valor: 40000, mes: 7, cuenta: 'Xise', dia: 10, status: 'COMPLETADO' },
+    { dni: '29556712', nombre: 'Sandra Elizabeth', apellido: 'Ríos', cel: '11 4987-6543', canal: 'SEBASTIAN', cuotas: 4, valor: 42000, mes: 8, cuenta: 'Adriana', dia: 7, status: 'COMPLETADO' },
+    { dni: '30112456', nombre: 'Claudia Viviana', apellido: 'Herrera', cel: '381 456-7890', canal: 'TRAMOS', cuotas: 3, valor: 42000, mes: 9, cuenta: 'Openpay', dia: 8, status: 'COMPLETADO' },
+    { dni: '22889012', nombre: 'Eduardo Ramón', apellido: 'Acosta', cel: '11 5234-9901', canal: 'VENDEDORAS', vend: 'Sofía Peralta', cuotas: 3, valor: 44000, mes: 10, cuenta: 'Mercado Pago', dia: 6, status: 'BAJA_C2' },
+    { dni: '31445890', nombre: 'Mónica Beatriz', apellido: 'Vega', cel: '223 589-1122', canal: 'SEBASTIAN', cuotas: 4, valor: 45000, mes: 11, cuenta: 'Xise', dia: 9, status: 'COMPLETADO' },
+    { dni: '25990321', nombre: 'Daniela Karina', apellido: 'Suárez', cel: '11 6098-4411', canal: 'VENDEDORAS', vend: 'Romina Sosa', cuotas: 6, valor: 45000, mes: 12, cuenta: 'Adriana', dia: 8, status: 'COMPLETADO' },
+    { dni: '27881234', nombre: 'Pablo Esteban', apellido: 'Luna', cel: '351 678-9011', canal: 'TRAMOS', cuotas: 12, valor: 35000, mes: 12, cuenta: 'Openpay', dia: 10, status: 'DEUDOR_2025' }
+  ];
+
+  for (const h of historicos2025) {
+    const p = createPlan({
+      dni: h.dni,
+      nombre: h.nombre,
+      apellido: h.apellido,
+      celular: h.cel,
+      canal: h.canal,
+      vendedora_nombre: h.vend || '',
+      modalidad_inicial: 'PAGO',
+      cantidad_cuotas: h.cuotas,
+      valor_cuota_base: h.valor,
+      mes_inicio: h.mes,
+      anio_inicio: 2025,
+      dia_vencimiento: 10,
+      cuenta_destino_inicial: h.cuenta,
+      fecha_comprobante_inicial: buildDateStr(2025, h.mes, h.dia),
+      notas: `Plan iniciado en ${h.mes}/2025.`,
+      operadora: 'Administración'
+    });
+
+    if (h.status === 'COMPLETADO') {
+      payRest(p, 'ALL', h.cuenta, h.dia);
+    } else if (h.status === 'ADELANTO_TARJETA') {
+      payRest(p, 1, h.cuenta, h.dia);
+      const refreshed = getPlanById(p.id);
+      const restIds = refreshed.cuotas.filter((c) => c.estado !== 'PAGADA').map((c) => c.id);
+      adelantarCuotas({
+        plan_id: p.id,
+        cuota_ids: restIds,
+        monto_total_cobrado: restIds.length * h.valor,
+        medio_pago: 'TARJETA_ADELANTO',
+        cuenta_destino: 'Tarjeta (Excepción Adelanto)',
+        fecha_comprobante: buildDateStr(2025, 8, 14),
+        observacion: 'Adelantó saldo restante con tarjeta en 2025 para certificación',
+        operadora: 'Marta (Cobranzas)'
+      });
+    } else if (h.status === 'BAJA_C2') {
+      darDeBajaPlan({
+        plan_id: p.id,
+        motivo: 'Solicitó baja en 2025 tras abonar cuota 1. Ingreso conservado.',
+        operadora: 'Claudia (Cobranzas)'
+      });
+    } else if (h.status === 'DEUDOR_2025') {
+      // Paid 9 of 12 installments, owes last 3 (Sep, Oct, Nov 2026)
+      payRest(p, 8, h.cuenta, 9);
+    }
+  }
+
+  // =========================================================================
+  // AÑO 2026 (ENERO A OCTUBRE 2026)
+  // =========================================================================
+  const historicos2026 = [
+    { dni: '28456123', nombre: 'Rosaura Inés', apellido: 'Godoy', cel: '11 4567-8901', canal: 'SEBASTIAN', cuotas: 3, valor: 46000, mes: 1, cuenta: 'Openpay', status: 'COMPLETADO' },
+    { dni: '32009182', nombre: 'Mariana Soledad', apellido: 'Bustos', cel: '341 512-9088', canal: 'VENDEDORAS', vend: 'Laura Martínez', cuotas: 4, valor: 46000, mes: 2, cuenta: 'Mercado Pago', status: 'COMPLETADO' },
+    { dni: '26119044', nombre: 'Sergio Fabián', apellido: 'Ibarra', cel: '221 609-1233', canal: 'TRAMOS', cuotas: 3, valor: 48000, mes: 3, cuenta: 'Xise', status: 'COMPLETADO' },
+    { dni: '29330198', nombre: 'Andrea Celeste', apellido: 'Ferreyra', cel: '11 5876-3321', canal: 'VENDEDORAS', vend: 'Carolina Gómez', cuotas: 6, valor: 48000, mes: 4, cuenta: 'Adriana', status: 'COMPLETADO' },
+    { dni: '33441209', nombre: 'Lucía Fernanda', apellido: 'Ponce', cel: '351 490-7766', canal: 'SEBASTIAN', cuotas: 3, valor: 48000, mes: 5, cuenta: 'Openpay', status: 'COMPLETADO' },
+    { dni: '24778901', nombre: 'Susana Beatriz', apellido: 'Molina', cel: '11 6234-5511', canal: 'TRAMOS', cuotas: 4, valor: 48000, mes: 6, cuenta: 'Mercado Pago', status: 'COMPLETADO' },
+    { dni: '31889234', nombre: 'Federico Nicolás', apellido: 'Campos', cel: '261 556-7788', canal: 'VENDEDORAS', vend: 'Valeria Díaz', cuotas: 3, valor: 50000, mes: 7, cuenta: 'Xise', status: 'COMPLETADO' },
+    { dni: '27112987', nombre: 'Estela Maris', apellido: 'Soria', cel: '11 5901-2234', canal: 'SEBASTIAN', cuotas: 4, valor: 50000, mes: 8, cuenta: 'Adriana', status: 'AL_DIA_NOV_PAGADA' },
+    { dni: '30554321', nombre: 'Natalia Lorena', apellido: 'Cabrera', cel: '381 523-4456', canal: 'VENDEDORAS', vend: 'Sofía Peralta', cuotas: 3, valor: 50000, mes: 9, cuenta: 'Mercado Pago', status: 'AL_DIA_NOV_PAGADA' },
+    { dni: '25667890', nombre: 'Miriam Gladys', apellido: 'Ojeda', cel: '11 4789-3300', canal: 'TRAMOS', cuotas: 4, valor: 50000, mes: 9, cuenta: 'Openpay', status: 'DEUDOR_OCT_NOV' }
+  ];
+
+  for (const h of historicos2026) {
+    const p = createPlan({
+      dni: h.dni,
+      nombre: h.nombre,
+      apellido: h.apellido,
+      celular: h.cel,
+      canal: h.canal,
+      vendedora_nombre: h.vend || '',
+      modalidad_inicial: 'PAGO',
+      cantidad_cuotas: h.cuotas,
+      valor_cuota_base: h.valor,
+      mes_inicio: h.mes,
+      anio_inicio: 2026,
+      dia_vencimiento: 10,
+      cuenta_destino_inicial: h.cuenta,
+      fecha_comprobante_inicial: buildDateStr(2026, h.mes, 7),
+      notas: `Plan iniciado en ${h.mes}/2026.`,
+      operadora: 'Administración'
+    });
+
+    if (h.status === 'COMPLETADO') {
+      payRest(p, 'ALL', h.cuenta, 8);
+    } else if (h.status === 'AL_DIA_NOV_PAGADA') {
+      // Pay up to Noviembre 2026
+      const toPay = p.cuotas.filter(
+        (c) => c.estado !== 'PAGADA' && (c.anio_vencimiento === 2026 && c.mes_vencimiento <= 11)
+      );
+      for (const c of toPay) {
+        registrarPagoCuota({
+          plan_id: p.id,
+          cuota_id: c.id,
+          monto_cobrado: c.saldo_pendiente,
+          cuenta_destino: h.cuenta,
+          fecha_comprobante: buildDateStr(c.anio_vencimiento, c.mes_vencimiento, 9),
+          observacion: 'Cuota abonada en término',
+          operadora: 'Marta (Cobranzas)'
+        });
+      }
+    } else if (h.status === 'DEUDOR_OCT_NOV') {
+      // Paid Sep, owes Oct and Nov 2026
+    }
+  }
+
+  // =========================================================================
+  // CASOS CLAVE DE OCTUBRE / NOVIEMBRE 2026 Y VENTAS CARGADAS HOY (13/11/2026)
+  // =========================================================================
+
   // 1. Cristina Gómez - Seña (Mismo mes) - Vendedoras (Laura Martínez) - Compromiso 20/11/2026
   createPlan({
     dni: '34567890',
@@ -1135,7 +1282,6 @@ function seedInitialPlans() {
     anio_inicio: 2026,
     dia_vencimiento: 10,
     cuenta_destino_inicial: 'Mercado Pago',
-    fecha_comprobante_sena: '2026-11-05',
     fecha_comprobante_inicial: '2026-11-05',
     monto_sena: 20000,
     fecha_compromiso: '2026-11-20',
@@ -1144,7 +1290,7 @@ function seedInitialPlans() {
   });
 
   // 2. Roberto Carlos Fernández - Deudor Atrasado (Cuota 2 vencida el 10/11/2026) - Canal Sebastián
-  const planRoberto = createPlan({
+  createPlan({
     dni: '28940112',
     nombre: 'Roberto Carlos',
     apellido: 'Fernández',
@@ -1161,7 +1307,6 @@ function seedInitialPlans() {
     notas: 'Venció cuota 2 el 10/11. Prometió transferir el viernes por la tarde.',
     operadora: 'Administración'
   });
-  void planRoberto;
 
   // 3. María Elena Quiroga - Alta (Pago diferido) - Canal Tramos - Comprometió pago 18/11/2026
   createPlan({
@@ -1222,7 +1367,7 @@ function seedInitialPlans() {
     operadora: 'Administración'
   });
 
-  // 6. Patricia Susana Ledesma - Plan 100% Completado (Adelantó saldo con Tarjeta para liberar certificado) - Tramos
+  // 6. Patricia Susana Ledesma - Plan 100% Completado (Adelantó saldo con Tarjeta) - Tramos
   const planPatricia = createPlan({
     dni: '24551239',
     nombre: 'Patricia Susana',
@@ -1249,11 +1394,11 @@ function seedInitialPlans() {
     cuenta_destino: 'Tarjeta (Excepción Adelanto)',
     fecha_comprobante: '2026-11-04',
     observacion: 'Canceló cuotas 2 y 3 con tarjeta para liberar certificado de inmediato',
-    operadora: 'Cobranzas'
+    operadora: 'Marta (Cobranzas)'
   });
 
   // 7. Silvia Noemí Castro - Cuota 2 pendiente en Noviembre (vence 25/11) - Vendedoras (Valeria Díaz)
-  const planSilvia = createPlan({
+  createPlan({
     dni: '30998123',
     nombre: 'Silvia Noemí',
     apellido: 'Castro',
@@ -1271,9 +1416,8 @@ function seedInitialPlans() {
     notas: 'Cobra haberes el día 22, vence el 25/11.',
     operadora: 'Administración'
   });
-  void planSilvia;
 
-  // 8. Jorge Luis Domínguez - Dado de BAJA a mitad de plan (pagó Cuota 1 y abandonó) - Canal Sebastián
+  // 8. Jorge Luis Domínguez - Dado de BAJA a mitad de plan - Canal Sebastián
   const planJorge = createPlan({
     dni: '22765109',
     nombre: 'Jorge Luis',
@@ -1294,10 +1438,10 @@ function seedInitialPlans() {
   darDeBajaPlan({
     plan_id: planJorge.id,
     motivo: 'Abandonó la cursada en cuota 2. Cuota 1 queda registrada como ingreso válido.',
-    operadora: 'Cobranzas'
+    operadora: 'Marta (Cobranzas)'
   });
 
-  // 9. Norma Beatriz Villalba - Seña mismo mes vencida (comprometió para el 11/11 y aún no pagó) - Tramos
+  // 9. Norma Beatriz Villalba - Seña mismo mes vencida (comprometió 11/11) - Tramos
   createPlan({
     dni: '27654321',
     nombre: 'Norma Beatriz',
@@ -1316,6 +1460,91 @@ function seedInitialPlans() {
     fecha_compromiso: '2026-11-11',
     notas: 'Debía completar los $25.000 restantes el 11/11. Reclamar por WhatsApp hoy.',
     operadora: 'Administración'
+  });
+
+  // =========================================================================
+  // VENTAS CARGADAS HOY MISMO (13/11/2026) PARA SIMULAR OPERACIÓN DEL DÍA
+  // =========================================================================
+
+  // 10. Cargada HOY 13/11/2026 - Pago Cuota 1 - Sebastián
+  createPlan({
+    dni: '35123456',
+    nombre: 'Luciana Paola',
+    apellido: 'Giménez',
+    celular: '11 6890-1144',
+    canal: 'SEBASTIAN',
+    modalidad_inicial: 'PAGO',
+    cantidad_cuotas: 3,
+    valor_cuota_base: 52000,
+    mes_inicio: 11,
+    anio_inicio: 2026,
+    dia_vencimiento: 10,
+    cuenta_destino_inicial: 'Openpay',
+    fecha_comprobante_inicial: '2026-11-13',
+    notas: 'Cargada hoy 13/11. Envió comprobante de Cuota 1 por Openpay.',
+    operadora: 'Administración (Ventas)'
+  });
+
+  // 11. Cargada HOY 13/11/2026 - Seña mismo mes - Vendedoras (Romina Sosa)
+  createPlan({
+    dni: '33789012',
+    nombre: 'Valeria Alejandra',
+    apellido: 'Morán',
+    celular: '351 645-8899',
+    canal: 'VENDEDORAS',
+    vendedora_nombre: 'Romina Sosa',
+    modalidad_inicial: 'SENA_MISMO_MES',
+    cantidad_cuotas: 4,
+    valor_cuota_base: 52000,
+    mes_inicio: 11,
+    anio_inicio: 2026,
+    dia_vencimiento: 10,
+    cuenta_destino_inicial: 'Mercado Pago',
+    fecha_comprobante_inicial: '2026-11-13',
+    monto_sena: 22000,
+    fecha_compromiso: '2026-11-24',
+    notas: 'Cargada hoy 13/11. Seña $22.000, completa los $30.000 el 24/11.',
+    operadora: 'Administración (Ventas)'
+  });
+
+  // 12. Cargada HOY 13/11/2026 - Alta diferida - Tramos
+  createPlan({
+    dni: '29456781',
+    nombre: 'Fernando Javier',
+    apellido: 'Almada',
+    celular: '221 511-2233',
+    canal: 'TRAMOS',
+    modalidad_inicial: 'ALTA',
+    cantidad_cuotas: 3,
+    valor_cuota_base: 55000,
+    mes_inicio: 11,
+    anio_inicio: 2026,
+    dia_vencimiento: 10,
+    fecha_compromiso: '2026-11-21',
+    notas: 'Cargada hoy 13/11. Alta diferida, transfiere Cuota 1 el 21/11.',
+    operadora: 'Administración (Ventas)'
+  });
+
+  // 13. Cargada HOY 13/11/2026 - Seña mes siguiente - Vendedoras (Laura Martínez)
+  createPlan({
+    dni: '32890123',
+    nombre: 'Gabriela Fernanda',
+    apellido: 'Roldán',
+    celular: '11 5345-6677',
+    canal: 'VENDEDORAS',
+    vendedora_nombre: 'Laura Martínez',
+    modalidad_inicial: 'SENA_MES_SIGUIENTE',
+    cantidad_cuotas: 3,
+    valor_cuota_base: 52000,
+    mes_inicio: 11,
+    anio_inicio: 2026,
+    dia_vencimiento: 10,
+    cuenta_destino_inicial: 'Xise',
+    fecha_comprobante_inicial: '2026-11-13',
+    monto_sena: 17000,
+    fecha_compromiso: '2026-12-05',
+    notas: 'Cargada hoy 13/11. Seña $17.000, abona saldo de $35.000 el 05/12.',
+    operadora: 'Administración (Ventas)'
   });
 }
 
