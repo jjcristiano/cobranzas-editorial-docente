@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="es" data-zoom="normal">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Editorial Docente — Sistema de Cobranzas y Cuentas Corrientes</title>
+  <meta name="description" content="Sistema centralizado en tiempo real de Cobranzas y Cuentas Corrientes para Editorial Docente. Gestión de transferencias, señas, altas, cuotas y bloqueo automático de certificados." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- TOP HEADER BAR -->
+  <header class="top-header">
+    <div class="top-header-inner">
+      <div class="brand-block">
+        <div class="brand-logo" aria-hidden="true">ED</div>
+        <div>
+          <h1 class="brand-title">Editorial Docente — Cobranzas y Cuentas Corrientes</h1>
+          <div class="brand-subtitle">
+            <span>Base de Datos Continua Multiusuario</span>
+            <span id="realtime-status-badge" class="realtime-badge">
+              <span class="realtime-dot"></span>
+              <span id="realtime-status-text">Conectado en vivo (1 equipo)</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <!-- Font Zoom Switcher for 50+ Accessibility -->
+        <div class="zoom-switcher" role="group" aria-label="Tamaño de letra">
+          <span class="zoom-label">Letra:</span>
+          <button type="button" id="btn-zoom-normal" class="zoom-btn active" data-zoom="normal" title="Tamaño de letra normal">A</button>
+          <button type="button" id="btn-zoom-large" class="zoom-btn" data-zoom="large" title="Tamaño de letra grande">A+</button>
+          <button type="button" id="btn-zoom-xlarge" class="zoom-btn" data-zoom="xlarge" title="Tamaño de letra extra grande">A++</button>
+        </div>
+
+        <!-- Active Operator / Shared Team Access -->
+        <button type="button" id="btn-operator-access" class="operator-btn" title="Cambiar nombre de operadora o bloquear pantalla con PIN compartido">
+          <span>👤 Operadora: <strong id="current-operator-label">Marta (Cobranzas)</strong></span>
+        </button>
+
+        <!-- Manage Cuentas Destino & Vendedoras -->
+        <button type="button" id="btn-open-catalogs" class="btn btn-header-secondary">
+          ⚙️ Cuentas y Vendedoras
+        </button>
+
+        <!-- Google Contacts CSV Exporter -->
+        <button type="button" id="btn-open-csv-export" class="btn btn-primary">
+          📥 Exportar Contactos del Mes (Google CSV)
+        </button>
+
+        <!-- Primary CTA for Administrativos -->
+        <button type="button" id="btn-open-new-sale" class="btn btn-cta-new">
+          ➕ Nueva Venta / Pasar a Cobranzas
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="main-container">
+    <!-- 1. GLOBAL MONTH/YEAR SELECTOR & GIANT SEARCH BAR -->
+    <section class="control-bar" aria-label="Filtro de Período y Buscador Rápido">
+      <div>
+        <span class="period-label">📅 Período de Cobranza (Sin crear planillas nuevas)</span>
+        <div class="period-selector-group">
+          <button type="button" id="btn-prev-month" class="period-nav-btn" title="Ir al mes anterior">◀ Mes Anterior</button>
+          <select id="select-month" class="period-select" aria-label="Seleccionar Mes">
+            <option value="1">Enero</option>
+            <option value="2">Febrero</option>
+            <option value="3">Marzo</option>
+            <option value="4">Abril</option>
+            <option value="5">Mayo</option>
+            <option value="6">Junio</option>
+            <option value="7">Julio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11" selected>Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
+          <select id="select-year" class="period-select tabular-nums" aria-label="Seleccionar Año">
+            <option value="2025">2025</option>
+            <option value="2026" selected>2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+          </select>
+          <button type="button" id="btn-next-month" class="period-nav-btn" title="Ir al mes siguiente">Mes Siguiente ▶</button>
+          <button type="button" id="btn-toggle-all-periods" class="period-all-toggle" title="Ver histórico continuo sin importar el mes">
+            Ver Todos los Meses
+          </button>
+        </div>
+      </div>
+
+      <!-- GIANT INSTANT SEARCH -->
+      <div>
+        <span class="period-label">🔍 Buscador Rápido Instantáneo (DNI, Nombre, Apellido, Celular o Vendedora)</span>
+        <div class="search-box-wrapper">
+          <svg class="search-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="search"
+            id="input-global-search"
+            class="search-input-giant"
+            placeholder="Escriba aquí DNI (ej. 34567890), Nombre, Apellido o Celular..."
+            autocomplete="off"
+          />
+          <button type="button" id="btn-clear-search" class="search-clear-btn" hidden>Limpiar ✕</button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:0.35rem; align-items:flex-end;">
+        <span class="period-label">Solo Transferencias</span>
+        <span style="font-size:0.84rem; font-weight:700; color:var(--text-secondary); background:var(--bg-subtle); border:1.5px solid var(--border-subtle); padding:0.5rem 0.75rem; border-radius:8px;">
+          🏦 Ventas por Transferencia<br/>
+          <small style="color:var(--text-muted);">Adelantos aceptan Tarjeta</small>
+        </span>
+      </div>
+    </section>
+
+    <!-- 2. DASHBOARD SUMMARY CARDS -->
+    <section class="summary-grid" aria-label="Resumen del Período">
+      <div class="kpi-card kpi-cobrado">
+        <div class="kpi-title" id="kpi-title-cobrado">Total Cobrado en el Mes</div>
+        <div class="kpi-value text-success tabular-nums" id="kpi-val-cobrado">$0</div>
+        <div class="kpi-subtitle" id="kpi-sub-cobrado">0 pagos registrados en el período</div>
+      </div>
+
+      <div class="kpi-card kpi-pendiente">
+        <div class="kpi-title" id="kpi-title-pendiente">Total Pendiente a Cobrar del Mes</div>
+        <div class="kpi-value text-warning tabular-nums" id="kpi-val-pendiente">$0</div>
+        <div class="kpi-subtitle" id="kpi-sub-pendiente">0 cuotas / saldos de seña por cobrar</div>
+      </div>
+
+      <div class="kpi-card kpi-deudores">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div class="kpi-title">Deudores Atrasados (Reclamar)</div>
+          <button type="button" id="btn-kpi-filter-deudores" class="btn btn-danger-outline btn-sm" style="min-height:30px; padding:0.15rem 0.55rem; font-size:0.78rem;">
+            Ver Deudores
+          </button>
+        </div>
+        <div class="kpi-value text-danger tabular-nums" id="kpi-val-deudores">0 Clientes</div>
+        <div class="kpi-subtitle" id="kpi-sub-deudores">Total vencido: $0</div>
+      </div>
+
+      <div class="kpi-card kpi-cuentas">
+        <div class="kpi-title" id="kpi-title-cuentas">Ingresos por Cuenta Destino (Mes)</div>
+        <div id="kpi-cuentas-breakdown" class="cuentas-breakdown-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. LARGE CHANNEL TABS (EX-SPREADSHEETS) + DAILY WORK QUICK FILTERS -->
+    <section class="channel-tabs-container" aria-label="Canales de Venta y Filtros Operativos">
+      <div>
+        <span class="period-label" style="margin-bottom:0.45rem;">📂 Canales / Orígenes de Venta (Reemplaza las antiguas hojas de cálculo)</span>
+        <div class="channel-tabs-row" role="tablist">
+          <button type="button" class="channel-tab active" data-canal="TODOS" id="tab-canal-todos">
+            <span>📋 Todos los Canales</span>
+            <span class="channel-tab-count tabular-nums" id="count-canal-todos">0</span>
+          </button>
+          <button type="button" class="channel-tab" data-canal="SEBASTIAN" id="tab-canal-sebastian">
+            <span>👤 1. Sebastián</span>
+            <span class="channel-tab-count tabular-nums" id="count-canal-sebastian">0</span>
+          </button>
+          <button type="button" class="channel-tab" data-canal="VENDEDORAS" id="tab-canal-vendedoras">
+            <span>👩‍💼 2. Vendedoras</span>
+            <span class="channel-tab-count tabular-nums" id="count-canal-vendedoras">0</span>
+          </button>
+          <button type="button" class="channel-tab" data-canal="TRAMOS" id="tab-canal-tramos">
+            <span>🎓 3. Tramos</span>
+            <span class="channel-tab-count tabular-nums" id="count-canal-tramos">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Optional Sub-filter bar when Vendedoras is selected -->
+      <div id="vendedoras-subfilter-bar" class="vendedora-subfilter-bar" hidden>
+        <span class="vendedora-subfilter-label">👩‍💼 Filtrar por Vendedora:</span>
+        <div id="vendedoras-chips-container" style="display:flex; flex-wrap:wrap; gap:0.4rem;"></div>
+      </div>
+
+      <!-- Daily Cobranzas Quick Filter Pills (1 Click) -->
+      <div class="quick-filters-section">
+        <div class="quick-filters-header">
+          <span class="quick-filters-title">⚡ Filtros Rápidos de Trabajo Diario (1 Clic para Cobranzas):</span>
+          <span id="active-filter-summary" style="font-size:0.88rem; font-weight:700; color:var(--primary);"></span>
+        </div>
+        <div class="quick-pills-wrap" id="quick-pills-container">
+          <button type="button" class="filter-pill active" data-filter="TODOS" id="pill-filter-todos">
+            <span>Todos</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-todos">0</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="SENAS_ESTE_MES" id="pill-filter-senas-mes">
+            <span>⏳ Señas por cobrar (Este mes)</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-senas-mes">0</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="SENAS_MES_SIGUIENTE" id="pill-filter-senas-sig">
+            <span>📆 Señas mes siguiente</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-senas-sig">0</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="ALTAS_PENDIENTES" id="pill-filter-altas">
+            <span>🔔 Altas pendientes de pago</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-altas">0</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="CUOTAS_PENDIENTES_MES" id="pill-filter-cuotas-mes">
+            <span>💬 Cuotas pendientes del mes</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-cuotas-mes">0</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="DEUDORES" id="pill-filter-deudores">
+            <span>🚨 Deudores atrasados</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-deudores">0</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="COMPLETADOS" id="pill-filter-completados">
+            <span>✅ Al día / Completados</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-completados">0</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="BAJAS" id="pill-filter-bajas">
+            <span>⛔ Dados de baja</span>
+            <span class="pill-badge tabular-nums" id="badge-pill-bajas">0</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. CLIENT RECORDS LIST -->
+    <section aria-label="Listado de Clientes y Cuentas Corrientes">
+      <div id="records-list-container" class="records-list">
+        <!-- Populated dynamically -->
+      </div>
+    </section>
+  </main>
+
+  <!-- =========================================================================
+       MODAL 1: NUEVA VENTA / PASAR A COBRANZAS (GUIDED STEP-BY-STEP WIZARD)
+       ========================================================================= -->
+  <div id="modal-new-sale" class="modal-backdrop" hidden>
+    <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="title-modal-new-sale">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="title-modal-new-sale">➕ Nueva Venta / Pasar a Cobranzas</h2>
+          <p style="font-size:0.88rem; color:#CBD5E1; margin-top:0.15rem;">
+            Formulario guiado para Administrativos y Cobranzas • Sincronización instantánea con todo el equipo
+          </p>
+        </div>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-new-sale">Cerrar ✕</button>
+      </div>
+
+      <form id="form-new-sale">
+        <div class="modal-body">
+          <div class="alert-banner alert-info">
+            <span style="font-size:1.3rem;">🏦</span>
+            <div>
+              <strong>Regla de Ingreso al Sistema: Solo Transferencias Bancarias.</strong><br/>
+              A este sistema únicamente ingresan ventas abonadas por Transferencia Bancaria. Las ventas abonadas originalmente con tarjeta no pasan por cobranzas.
+            </div>
+          </div>
+
+          <div id="new-sale-error-box" class="alert-banner alert-danger" hidden></div>
+
+          <!-- PASO 1: DATOS DEL CLIENTE Y CANAL -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <span class="step-number-badge">1</span>
+              <span>Datos del Cliente y Canal de Venta</span>
+            </div>
+
+            <div class="form-grid-4">
+              <div class="form-group">
+                <label class="form-label" for="ns-dni">Número de DNI *</label>
+                <input type="text" id="ns-dni" class="form-input tabular-nums" placeholder="Ej: 34567890" required />
+                <span class="form-help">Sin puntos (se usa como apellido en Google CSV)</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ns-nombre">Nombre(s) *</label>
+                <input type="text" id="ns-nombre" class="form-input" placeholder="Ej: Cristina" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ns-apellido">Apellido(s) *</label>
+                <input type="text" id="ns-apellido" class="form-input" placeholder="Ej: Gómez" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ns-celular">Teléfono Celular (WhatsApp) *</label>
+                <input type="text" id="ns-celular" class="form-input tabular-nums" placeholder="Ej: 11 5432-8910" required />
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top:0.35rem;">
+              <span class="form-label">Seleccione el Canal / Origen de la Venta *</span>
+              <div class="option-cards-grid" id="ns-canal-cards">
+                <div class="option-card selected" data-canal-val="SEBASTIAN" tabindex="0">
+                  <div class="option-card-title">👤 1. Sebastián</div>
+                  <div class="option-card-desc">Ventas directas realizadas por Sebastián</div>
+                </div>
+                <div class="option-card" data-canal-val="VENDEDORAS" tabindex="0">
+                  <div class="option-card-title">👩‍💼 2. Vendedoras</div>
+                  <div class="option-card-desc">Ventas del equipo de vendedoras (Requiere indicar nombre)</div>
+                </div>
+                <div class="option-card" data-canal-val="TRAMOS" tabindex="0">
+                  <div class="option-card-title">🎓 3. Tramos</div>
+                  <div class="option-card-desc">Ventas correspondientes exclusivamente a Tramos</div>
+                </div>
+              </div>
+              <input type="hidden" id="ns-canal" value="SEBASTIAN" />
+            </div>
+
+            <!-- Mandatory Seller Field when Canal == VENDEDORAS -->
+            <div id="ns-vendedora-box" class="alert-banner alert-warning" style="flex-direction:column; align-items:stretch;" hidden>
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+                <strong>👩‍💼 Obligatorio para canal "Vendedoras": Seleccione o escriba el Nombre de la Vendedora *</strong>
+              </div>
+              <div class="form-grid-2" style="margin-top:0.35rem;">
+                <div class="form-group">
+                  <label class="form-label" for="ns-vendedora-select">Seleccionar Vendedora del Equipo</label>
+                  <select id="ns-vendedora-select" class="form-select">
+                    <option value="">-- Seleccione una vendedora --</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="ns-vendedora-custom">O escribir nueva vendedora si no está en la lista</label>
+                  <input type="text" id="ns-vendedora-custom" class="form-input" placeholder="Ej: Mariana López" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASO 2: PLAN DE CUOTAS -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <span class="step-number-badge">2</span>
+              <span>Configuración del Plan de Cuotas</span>
+            </div>
+
+            <div class="form-grid-4">
+              <div class="form-group">
+                <label class="form-label" for="ns-cantidad-cuotas">Cantidad Total de Cuotas *</label>
+                <div style="display:flex; gap:0.35rem; margin-bottom:0.35rem;">
+                  <button type="button" class="btn btn-secondary btn-sm ns-quick-cuotas" data-cuotas="2">2</button>
+                  <button type="button" class="btn btn-primary btn-sm ns-quick-cuotas" data-cuotas="3">3</button>
+                  <button type="button" class="btn btn-secondary btn-sm ns-quick-cuotas" data-cuotas="4">4</button>
+                  <button type="button" class="btn btn-secondary btn-sm ns-quick-cuotas" data-cuotas="6">6</button>
+                </div>
+                <input type="number" id="ns-cantidad-cuotas" class="form-input tabular-nums" value="3" min="1" max="36" required />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ns-valor-cuota">Valor de Cada Cuota ($) *</label>
+                <input type="number" id="ns-valor-cuota" class="form-input tabular-nums" value="50000" min="1" step="any" required />
+                <span class="form-help" id="ns-total-plan-help">Total del plan: $150.000</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ns-mes-inicio">Mes y Año de Inicio *</label>
+                <div style="display:grid; grid-template-columns: 1.3fr 1fr; gap:0.4rem;">
+                  <select id="ns-mes-inicio" class="form-select">
+                    <option value="1">Enero</option>
+                    <option value="2">Febrero</option>
+                    <option value="3">Marzo</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Mayo</option>
+                    <option value="6">Junio</option>
+                    <option value="7">Julio</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11" selected>Noviembre</option>
+                    <option value="12">Diciembre</option>
+                  </select>
+                  <select id="ns-anio-inicio" class="form-select tabular-nums">
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ns-dia-vencimiento">Día Fijo de Vencimiento</label>
+                <input type="number" id="ns-dia-vencimiento" class="form-input tabular-nums" value="10" min="1" max="28" required />
+                <span class="form-help">Día del mes en que vencen las cuotas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASO 3: MODALIDAD DE INICIO DE COBRANZA -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <span class="step-number-badge">3</span>
+              <span>Modalidad de Inicio de Cobranza (Estado Inicial)</span>
+            </div>
+
+            <div class="option-cards-grid" id="ns-modalidad-cards">
+              <div class="option-card selected" data-mod-val="PAGO" tabindex="0">
+                <div class="option-card-title">✅ 1. Pago (Cuota 1 abonada)</div>
+                <div class="option-card-desc">Pagó la totalidad de la Cuota 1. Quedan pendientes las cuotas restantes.</div>
+              </div>
+              <div class="option-card" data-mod-val="SENA_MISMO_MES" tabindex="0">
+                <div class="option-card-title">⏳ 2. Seña (Mismo mes)</div>
+                <div class="option-card-desc">Abonó una seña hoy y paga el resto de la Cuota 1 dentro de este mismo mes.</div>
+              </div>
+              <div class="option-card" data-mod-val="SENA_MES_SIGUIENTE" tabindex="0">
+                <div class="option-card-title">📆 3. Seña Mes Siguiente</div>
+                <div class="option-card-desc">Abonó una seña hoy y completará el saldo de la Cuota 1 el mes próximo.</div>
+              </div>
+              <div class="option-card" data-mod-val="ALTA" tabindex="0">
+                <div class="option-card-title">🔔 4. Alta (Pago diferido)</div>
+                <div class="option-card-desc">Se da de alta sin dinero recibido aún. Se registra fecha prometida de pago.</div>
+              </div>
+            </div>
+            <input type="hidden" id="ns-modalidad" value="PAGO" />
+
+            <!-- Dynamic Fields for Modality -->
+            <div id="ns-mod-details-box" style="margin-top:0.5rem; padding:1rem; background:#FFFFFF; border:2px solid var(--border-strong); border-radius:10px;">
+              <div class="form-grid-3" id="ns-payment-fields-row">
+                <div class="form-group" id="group-ns-monto-sena" hidden>
+                  <label class="form-label" for="ns-monto-sena">Monto de la Seña Recibida ($) *</label>
+                  <input type="number" id="ns-monto-sena" class="form-input tabular-nums" placeholder="Ej: 20000" min="1" step="any" />
+                  <span class="form-help" id="ns-sena-calculo-help" style="color:var(--warning); font-weight:800;">
+                    Se descuenta automáticamente de la Cuota 1
+                  </span>
+                </div>
+
+                <div class="form-group" id="group-ns-cuenta-inicial">
+                  <label class="form-label" for="ns-cuenta-inicial" id="label-ns-cuenta-inicial">Cuenta Destino donde ingresó el dinero *</label>
+                  <select id="ns-cuenta-inicial" class="form-select"></select>
+                </div>
+
+                <div class="form-group" id="group-ns-fecha-comprobante">
+                  <label class="form-label" for="ns-fecha-comprobante" id="label-ns-fecha-comprobante">Fecha real del Comprobante de Pago *</label>
+                  <input type="date" id="ns-fecha-comprobante" class="form-input tabular-nums" />
+                </div>
+
+                <div class="form-group" id="group-ns-fecha-compromiso" hidden>
+                  <label class="form-label" for="ns-fecha-compromiso" id="label-ns-fecha-compromiso">Fecha de Compromiso de Pago Restante *</label>
+                  <input type="date" id="ns-fecha-compromiso" class="form-input tabular-nums" />
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-top:0.85rem;">
+                <label class="form-label" for="ns-notas">Notas / Recordatorio para la Operadora de Cobranzas</label>
+                <input
+                  type="text"
+                  id="ns-notas"
+                  class="form-input"
+                  placeholder="Ej: Abona restante el 20/11 / Cobra a mitad de mes..."
+                />
+              </div>
+
+              <!-- Live Schedule & Balance Preview -->
+              <div id="ns-live-preview-banner" class="alert-banner alert-info" style="margin-top:0.85rem;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-new-sale">Cancelar</button>
+          <button type="submit" id="btn-submit-new-sale" class="btn btn-cta-new">
+            💾 Guardar Venta y Pasar a Cobranzas
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 2: FICHA INDIVIDUAL DEL CLIENTE (DETALLE, HISTORIAL, ADELANTO, BAJA)
+       ========================================================================= -->
+  <div id="modal-client-detail" class="modal-backdrop" hidden>
+    <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="title-modal-client-detail">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="title-modal-client-detail">Ficha Individual del Cliente</h2>
+          <p id="subtitle-modal-client-detail" style="font-size:0.9rem; color:#CBD5E1; margin-top:0.15rem;"></p>
+        </div>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-client-detail">Cerrar Ficha ✕</button>
+      </div>
+
+      <div class="modal-body" id="body-modal-client-detail">
+        <!-- Populated dynamically when opening a client ficha -->
+      </div>
+
+      <div class="modal-footer" style="justify-content:space-between;">
+        <div id="footer-left-client-detail"></div>
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-client-detail">Cerrar ventana</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 3: REGISTRAR PAGO DE CUOTA / COMPLETAR SEÑA / CONFIRMAR ALTA
+       ========================================================================= -->
+  <div id="modal-pay-cuota" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-modal="true" aria-labelledby="title-modal-pay-cuota">
+      <div class="modal-header">
+        <h2 class="modal-title" id="title-modal-pay-cuota">Registrar Pago</h2>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-pay-cuota">Cerrar ✕</button>
+      </div>
+      <form id="form-pay-cuota">
+        <div class="modal-body">
+          <input type="hidden" id="pay-plan-id" />
+          <input type="hidden" id="pay-cuota-id" />
+
+          <div id="pay-cuota-summary-banner" class="alert-banner alert-info"></div>
+          <div id="pay-cuota-error-box" class="alert-banner alert-danger" hidden></div>
+
+          <div class="form-group">
+            <label class="form-label" for="pay-monto-cobrado">Monto Abonado ($) * (Editable si hubo ajuste/descuento)</label>
+            <input type="number" id="pay-monto-cobrado" class="form-input tabular-nums" step="any" min="1" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="pay-cuenta-destino">Cuenta Destino donde ingresó la transferencia *</label>
+            <select id="pay-cuenta-destino" class="form-select" required></select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="pay-fecha-comprobante">Fecha Real del Comprobante del Cliente *</label>
+            <input type="date" id="pay-fecha-comprobante" class="form-input tabular-nums" required />
+            <span class="form-help">También se guardará automáticamente la fecha y hora actual de carga en el sistema.</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="pay-observacion">Observación o Nota del Pago (Opcional)</label>
+            <input type="text" id="pay-observacion" class="form-input" placeholder="Ej: Envió comprobante por WhatsApp" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-pay-cuota">Cancelar</button>
+          <button type="submit" id="btn-submit-pay-cuota" class="btn btn-success">
+            ✅ Confirmar y Registrar Pago
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 4: ADELANTAR CUOTAS / CANCELACIÓN TOTAL (TRANSFERENCIA O TARJETA)
+       ========================================================================= -->
+  <div id="modal-adelanto" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="title-modal-adelanto">
+      <div class="modal-header">
+        <h2 class="modal-title" id="title-modal-adelanto">⚡ Adelantar Cuotas / Cancelación Total del Plan</h2>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-adelanto">Cerrar ✕</button>
+      </div>
+      <form id="form-adelanto">
+        <div class="modal-body">
+          <input type="hidden" id="adelanto-plan-id" />
+          <div class="alert-banner alert-info">
+            <span style="font-size:1.3rem;">💳</span>
+            <div>
+              <strong>Excepción permitida por Regla de Negocio:</strong><br/>
+              Si un cliente activo en cobranzas decide adelantar todas las cuotas restantes y pagarlas con <strong>Tarjeta</strong> (o Transferencia) para liberar su certificado de inmediato, seleccione las cuotas aquí. Al cancelar el 100%, el certificado pasará automáticamente a <strong>LISTO PARA ENTREGAR CERTIFICACIÓN</strong>.
+            </div>
+          </div>
+
+          <div id="adelanto-error-box" class="alert-banner alert-danger" hidden></div>
+
+          <div class="form-group">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <span class="form-label">1. Seleccione las cuotas pendientes a adelantar / cancelar *</span>
+              <button type="button" id="btn-adelanto-select-all" class="btn btn-secondary btn-sm">Seleccionar Todas las Restantes</button>
+            </div>
+            <div id="adelanto-cuotas-checklist" style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.35rem;"></div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="adelanto-medio-pago">2. Medio de Pago del Adelanto *</label>
+              <select id="adelanto-medio-pago" class="form-select">
+                <option value="TARJETA_ADELANTO">💳 Tarjeta de Crédito / Débito (Excepción Cancelación)</option>
+                <option value="TRANSFERENCIA">🏦 Transferencia Bancaria a Cuenta Destino</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="adelanto-cuenta-destino">3. Cuenta Destino / Medio *</label>
+              <select id="adelanto-cuenta-destino" class="form-select"></select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="adelanto-monto-total">4. Monto Total Cobrado ($) * (Editable)</label>
+              <input type="number" id="adelanto-monto-total" class="form-input tabular-nums" step="any" min="1" required />
+              <span class="form-help">Puede ajustar el monto si se aplicó descuento por cancelación anticipada.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="adelanto-fecha-comprobante">5. Fecha Real del Comprobante / Cupón *</label>
+              <input type="date" id="adelanto-fecha-comprobante" class="form-input tabular-nums" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="adelanto-observacion">Observación (Opcional)</label>
+            <input type="text" id="adelanto-observacion" class="form-input" placeholder="Ej: Adelantó todas las cuotas con tarjeta para liberar certificado" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-adelanto">Cancelar</button>
+          <button type="submit" class="btn btn-success">
+            ✅ Registrar Adelanto / Cancelación
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 5: EXPORTADOR DE CONTACTOS GOOGLE CONTACTS CSV
+       ========================================================================= -->
+  <div id="modal-csv-export" class="modal-backdrop" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="title-modal-csv">
+      <div class="modal-header">
+        <h2 class="modal-title" id="title-modal-csv">📥 Exportar Contactos del Mes para Google Contacts (CSV)</h2>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-csv-export">Cerrar ✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-banner alert-success">
+          <span style="font-size:1.3rem;">📱</span>
+          <div>
+            <strong>Formato Obligatorio para Sincronización con WhatsApp en el Celular:</strong><br/>
+            • <strong>Nombre (First Name):</strong> Nombre y Apellido del cliente (ej. <code>Cristina Gómez</code>)<br/>
+            • <strong>Apellido (Last Name):</strong> Número de DNI del cliente (ej. <code>34567890</code>)<br/>
+            • <strong>Teléfono (Mobile Phone):</strong> Número de celular formateado correctamente
+          </div>
+        </div>
+
+        <div id="csv-preview-summary" style="font-weight:800; font-size:1rem;"></div>
+
+        <div class="cuotas-table-wrap" style="max-height:340px; overflow-y:auto;">
+          <table class="cuotas-table">
+            <thead>
+              <tr>
+                <th>Nombre (First Name)</th>
+                <th>Apellido = DNI (Last Name)</th>
+                <th>Teléfono (Mobile Phone)</th>
+                <th>Canal y Pendiente</th>
+              </tr>
+            </thead>
+            <tbody id="csv-preview-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-csv-export">Cerrar</button>
+        <a id="btn-download-csv-now" href="/api/export/google-contacts-csv" class="btn btn-primary" download>
+          📥 Descargar Archivo .CSV para Google Contacts
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 6: GESTIÓN DE CUENTAS DESTINO, VENDEDORAS Y CONFIGURACIÓN
+       ========================================================================= -->
+  <div id="modal-catalogs" class="modal-backdrop" hidden>
+    <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="title-modal-catalogs">
+      <div class="modal-header">
+        <h2 class="modal-title" id="title-modal-catalogs">⚙️ Gestión de Cuentas Destino, Vendedoras y Parámetros</h2>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-catalogs">Cerrar ✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid-2">
+          <!-- Cuentas Destino -->
+          <div class="form-section">
+            <div class="form-section-title">🏦 Cuentas Destino de Cobranza</div>
+            <p class="form-help">Agregue o desactive cuentas bancarias / billeteras donde ingresa el dinero (Openpay, Xise, Mercado Pago, Adriana, etc.) sin tocar código.</p>
+            <form id="form-add-cuenta" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <input type="text" id="input-new-cuenta-nombre" class="form-input" placeholder="Nombre (ej. Banco Galicia)" style="flex:1;" required />
+              <input type="text" id="input-new-cuenta-alias" class="form-input" placeholder="Alias o descripción (opcional)" style="flex:1;" />
+              <button type="submit" class="btn btn-primary">➕ Agregar Cuenta</button>
+            </form>
+            <div id="catalog-cuentas-list" style="display:flex; flex-direction:column; gap:0.45rem; margin-top:0.5rem;"></div>
+          </div>
+
+          <!-- Vendedoras -->
+          <div class="form-section">
+            <div class="form-section-title">👩‍💼 Equipo de Vendedoras</div>
+            <p class="form-help">Agregue o desactive vendedoras para el canal obligatorio "Vendedoras".</p>
+            <form id="form-add-vendedora" style="display:flex; gap:0.5rem;">
+              <input type="text" id="input-new-vendedora-nombre" class="form-input" placeholder="Nombre y Apellido de la Vendedora" style="flex:1;" required />
+              <button type="submit" class="btn btn-primary">➕ Agregar Vendedora</button>
+            </form>
+            <div id="catalog-vendedoras-list" style="display:flex; flex-direction:column; gap:0.45rem; margin-top:0.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- Configuración General y Plantilla de WhatsApp -->
+        <div class="form-section">
+          <div class="form-section-title">📅 Día Fijo de Vencimiento y Mensaje de Reclamo por WhatsApp</div>
+          <form id="form-save-config">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="cfg-dia-vencimiento">Día Fijo de Vencimiento Mensual por Defecto</label>
+                <input type="number" id="cfg-dia-vencimiento" class="form-input tabular-nums" min="1" max="28" value="10" required />
+                <span class="form-help">Si pasa esta fecha del mes en curso y la cuota no está paga, el cliente pasa automáticamente a Deudor.</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="cfg-pin-equipo">PIN / Contraseña Única Compartida del Equipo</label>
+                <input type="text" id="cfg-pin-equipo" class="form-input tabular-nums" value="2026" required />
+                <span class="form-help">Permite que todo el equipo ingrese sin fricción con una sola clave compartida.</span>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:0.75rem;">
+              <label class="form-label" for="cfg-whatsapp-cuota">Plantilla de Mensaje de WhatsApp para Cuotas Pendientes</label>
+              <input type="text" id="cfg-whatsapp-cuota" class="form-input" />
+              <span class="form-help">Variables disponibles: <code>{nombre}</code>, <code>{numero_cuota}</code>, <code>{monto_pendiente}</code></span>
+            </div>
+            <div style="margin-top:0.85rem; display:flex; justify-content:flex-end;">
+              <button type="submit" class="btn btn-success">💾 Guardar Configuración</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-catalogs">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 7: WHATSAPP MESSAGE PREVIEW / 1-CLICK SEND & EDIT
+       ========================================================================= -->
+  <div id="modal-whatsapp" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-modal="true" aria-labelledby="title-modal-whatsapp">
+      <div class="modal-header" style="background:#075E54;">
+        <h2 class="modal-title" id="title-modal-whatsapp">💬 Enviar Reclamo por WhatsApp Web</h2>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-whatsapp">Cerrar ✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="wa-client-info" style="font-weight:800; font-size:1.05rem;"></div>
+        <div class="form-group">
+          <label class="form-label" for="wa-message-text">Mensaje prellenado (puede editarlo antes de abrir WhatsApp):</label>
+          <textarea id="wa-message-text" class="form-textarea" rows="4"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-whatsapp">Cancelar</button>
+        <a id="btn-wa-launch" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp">
+          📲 Abrir WhatsApp Web Ahora
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 8: OPERADORA ACTIVA Y ACCESO UNIFICADO DE EQUIPO
+       ========================================================================= -->
+  <div id="modal-operator" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-modal="true" aria-labelledby="title-modal-operator">
+      <div class="modal-header">
+        <h2 class="modal-title" id="title-modal-operator">👤 Identificación de Operadora / Acceso de Equipo</h2>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-operator">Cerrar ✕</button>
+      </div>
+      <form id="form-operator">
+        <div class="modal-body">
+          <div class="alert-banner alert-info">
+            <span>🤝</span>
+            <div>
+              <strong>Cuenta Única Compartida en Tiempo Real:</strong><br/>
+              Todo el equipo accede a la misma base sincronizada al instante. Seleccione su nombre o rol para que quede registrado quién cargó cada pago o nota.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Seleccionar rápido quién opera en esta PC:</label>
+            <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+              <button type="button" class="btn btn-secondary btn-sm quick-op-btn" data-op="Marta (Cobranzas)">Marta (Cobranzas)</button>
+              <button type="button" class="btn btn-secondary btn-sm quick-op-btn" data-op="Claudia (Cobranzas)">Claudia (Cobranzas)</button>
+              <button type="button" class="btn btn-secondary btn-sm quick-op-btn" data-op="Administración (Ventas)">Administración (Ventas)</button>
+              <button type="button" class="btn btn-secondary btn-sm quick-op-btn" data-op="Sebastián">Sebastián</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="input-operator-name">Nombre de la Operadora / Administrativo en esta PC *</label>
+            <input type="text" id="input-operator-name" class="form-input" value="Marta (Cobranzas)" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="input-operator-pin">PIN de Equipo Compartido (por defecto: 2026)</label>
+            <input type="password" id="input-operator-pin" class="form-input tabular-nums" value="2026" placeholder="2026" required />
+          </div>
+          <div id="operator-error-box" class="alert-banner alert-danger" hidden></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-operator">Cancelar</button>
+          <button type="submit" class="btn btn-primary">✅ Confirmar Operadora</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL 9: CONFIRMACIÓN DE BAJA DEL PLAN (PREVENCIÓN DE ERRORES)
+       ========================================================================= -->
+  <div id="modal-confirm-baja" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-modal="true" aria-labelledby="title-modal-baja">
+      <div class="modal-header" style="background:#991B1B;">
+        <h2 class="modal-title" id="title-modal-baja">⛔ Confirmar Baja del Plan del Cliente</h2>
+        <button type="button" class="modal-close-btn" data-close-modal="modal-confirm-baja">Cerrar ✕</button>
+      </div>
+      <form id="form-confirm-baja">
+        <div class="modal-body">
+          <input type="hidden" id="baja-plan-id" />
+          <div class="alert-banner alert-danger">
+            <span style="font-size:1.4rem;">⚠️</span>
+            <div>
+              <strong>Atención: ¿Está segura de dar de BAJA a <span id="baja-client-name"></span>?</strong><br/>
+              1. <strong>No se devuelve el dinero</strong> de las cuotas ya abonadas (quedan registradas como ingreso válido).<br/>
+              2. Las cuotas restantes pendientes se <strong>anulan por baja</strong>.<br/>
+              3. La tarjeta del cliente pasará a estado <strong>BAJA (pintada en rojo suave)</strong> y su certificado quedará <strong>BLOQUEADO DEFINITIVAMENTE</strong>.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="baja-motivo">Motivo de la Baja *</label>
+            <input type="text" id="baja-motivo" class="form-input" value="Solicitó baja a mitad del plan / Abandonó cursada" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-confirm-baja">No, Volver Atrás</button>
+          <button type="submit" class="btn btn-danger">⛔ Sí, Dar de Baja Definitiva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
